@@ -499,6 +499,9 @@
         </div>
 
         <div class="version-info">
+            <div class="connection-info" style="margin-bottom: 5px; font-weight: 600; color: #4a5568;">
+                <!-- Se actualiza automáticamente -->
+            </div>
             Control Tasmota v2.0 - Desarrollado para Android APK
         </div>
     </div>
@@ -591,6 +594,16 @@
             }
         }
 
+        // Lista de proxies CORS de respaldo
+        const proxies = [
+            'https://api.allorigins.win/get?url=',
+            'https://corsproxy.io/?',
+            'https://cors-anywhere.herokuapp.com/',
+            'https://api.codetabs.com/v1/proxy?quest='
+        ];
+
+        let currentProxyIndex = 0;
+
         // Funciones principales
         async function leerTemperatura() {
             const ip = deviceIP.value.trim();
@@ -604,38 +617,135 @@
 
             try {
                 const url = `http://${ip}/cm?cmnd=Status%2010`;
-                
-                // Intentar petición directa primero
-                let response;
-                let data;
-                
+                let data = await fetchWithFallback(url);
+
+        // Detectar si está corriendo como APK vs navegador web
+        const isAPK = window.location.protocol === 'file:' || 
+                     navigator.userAgent.includes('wv') ||
+                     window.AndroidInterface !== undefined ||
+                     !window.location.hostname;
+
+        const isBrowser = !isAPK;
+
+        if (isAPK) {
+            console.log('🚀 Ejecutándose como APK de Android - Sin restricciones CORS');
+        } else {
+            console.log('🌐 Ejecutándose en navegador web - Usando proxies CORS');
+        }
+
+        // Función para intentar múltiples métodos de conexión
+        async function fetchWithFallback(url) {
+            // Si es APK, intentar conexión directa primero (sin CORS)
+            if (isAPK) {
                 try {
-                    response = await fetch(url, {
+                    console.log('🚀 APK: Conexión directa a Tasmota...');
+                    const response = await fetch(url, {
                         method: 'GET',
-                        mode: 'cors',
                         headers: {
                             'Accept': 'application/json',
                         }
                     });
                     
                     if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const text = await response.text();
+                    if (!text || !text.trim()) {
+                        throw new Error('Respuesta vacía del dispositivo');
+                    }
+                    
+                    const data = JSON.parse(text);
+                    console.log('✅ APK: Conexión directa exitosa');
+                    return data;
+                } catch (directError) {
+                    console.log('❌ APK: Conexión directa falló:', directError.message);
+                    showMessage(`Error de conexión: ${directError.message}`);
+                    throw directError;
+                }
+            }
+            
+            // Para navegadores web, usar proxies CORS
+            console.log('🌐 Navegador: Usando proxies CORS...');
+            
+            for (let i = 0; i < proxies.length; i++) {
+                const proxyIndex = (currentProxyIndex + i) % proxies.length;
+                const proxy = proxies[proxyIndex];
+                
+                try {
+                    console.log(`🔄 Probando proxy ${proxyIndex + 1}/${proxies.length}: ${proxy.split('?')[0]}...`);
+                    
+                    let proxyUrl;
+                    if (proxy.includes('allorigins')) {
+                        proxyUrl = proxy + encodeURIComponent(url);
+                    } else if (proxy.includes('codetabs')) {
+                        proxyUrl = proxy + encodeURIComponent(url);
+                    } else {
+                        proxyUrl = proxy + url;
+                    }
+                    
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 10000);
+                    
+                    const response = await fetch(proxyUrl, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                        },
+                        signal: controller.signal
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    
+                    if (!response.ok) {
                         throw new Error(`HTTP ${response.status}`);
                     }
                     
-                    data = await response.json();
-                } catch (corsError) {
-                    // Si falla CORS, intentar con proxy
-                    console.log('Usando proxy por CORS:', corsError.message);
-                    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-                    const proxyResponse = await fetch(proxyUrl);
+                    const proxyData = await response.json();
                     
-                    if (!proxyResponse.ok) {
-                        throw new Error(`Proxy error: ${proxyResponse.status}`);
+                    let actualData;
+                    if (proxy.includes('allorigins') && proxyData.contents) {
+                        actualData = JSON.parse(proxyData.contents);
+                    } else if (proxy.includes('codetabs') && proxyData.contents) {
+                        actualData = JSON.parse(proxyData.contents);
+                    } else {
+                        actualData = proxyData;
                     }
                     
-                    const proxyData = await proxyResponse.json();
-                    data = JSON.parse(proxyData.contents);
+                    // Si llegamos aquí, el proxy funcionó
+                    currentProxyIndex = proxyIndex;
+                    console.log(`✅ Proxy ${proxyIndex + 1} exitoso`);
+                    return actualData;
+                    
+                } catch (proxyError) {
+                    console.log(`❌ Proxy ${proxyIndex + 1} falló:`, proxyError.message);
+                    
+                    if (proxyError.name === 'AbortError') {
+                        console.log('⏱️ Timeout en proxy');
+                    }
+                    
+                    continue;
                 }
+            }
+            
+            throw new Error('Todos los métodos de conexión fallaron. Verifica que el dispositivo esté en la misma red WiFi.');
+        }
+
+        async function leerTemperatura() {
+            const ip = deviceIP.value.trim();
+            if (!ip) {
+                showMessage('Por favor ingresa la IP del dispositivo');
+                return;
+            }
+
+            setConnecting();
+            setButtonLoading(btnActualizar, true);
+
+            try {
+                const url = `http://${ip}/cm?cmnd=Status%2010`;
+                const data = await fetchWithFallback(url);
+
+                console.log('Respuesta Tasmota:', data);
 
                 console.log('Respuesta Tasmota:', data);
 
@@ -714,36 +824,7 @@
                 const url = `http://${ip}/cm?cmnd=Power%20${comando}`;
                 console.log(`Enviando comando: ${comando} a ${url}`);
                 
-                let response;
-                let data;
-                
-                try {
-                    response = await fetch(url, {
-                        method: 'GET',
-                        mode: 'cors',
-                        headers: {
-                            'Accept': 'application/json',
-                        }
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}`);
-                    }
-                    
-                    data = await response.json();
-                } catch (corsError) {
-                    console.log('Usando proxy para comando:', corsError.message);
-                    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-                    const proxyResponse = await fetch(proxyUrl);
-                    
-                    if (!proxyResponse.ok) {
-                        throw new Error(`Proxy error: ${proxyResponse.status}`);
-                    }
-                    
-                    const proxyData = await proxyResponse.json();
-                    data = JSON.parse(proxyData.contents);
-                }
-
+                const data = await fetchWithFallback(url);
                 console.log('Respuesta comando:', data);
                 
                 if (data.POWER !== undefined) {
@@ -894,6 +975,7 @@
             
             loadSettings();
             updateDisplay();
+            updateConnectionInfo();
             
             // Iniciar timers
             readingTimer = setInterval(leerTemperatura, 5000);
@@ -902,7 +984,10 @@
             // Primera lectura después de un pequeño delay
             setTimeout(leerTemperatura, 2000);
             
-            showMessage('Aplicación iniciada correctamente', 'success');
+            const modeMsg = isAPK ? 
+                'Modo APK: Conexión directa a Tasmota' : 
+                'Modo Web: Usando proxies para CORS';
+            showMessage(modeMsg, 'success');
         }
 
         // Event Listeners
@@ -1043,14 +1128,14 @@
         `;
         document.head.appendChild(style);
 
-        // Detectar si está corriendo como APK
-        const isAPK = window.location.protocol === 'file:' || 
-                     navigator.userAgent.includes('wv') ||
-                     window.AndroidInterface !== undefined;
-
-        if (isAPK) {
-            console.log('Ejecutándose como APK de Android');
-            // Ajustes específicos para APK si es necesario
+        // Mostrar información de conexión en la UI
+        function updateConnectionInfo() {
+            const infoDiv = document.querySelector('.connection-info');
+            if (infoDiv) {
+                infoDiv.textContent = isAPK ? 
+                    '📱 Modo APK - Conexión directa disponible' : 
+                    '🌐 Modo Web - Usando proxies CORS';
+            }
         }
 
         // Inicializar la aplicación
