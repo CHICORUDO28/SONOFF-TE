@@ -1,1157 +1,302 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Control Tasmota</title>
-    
-    <!-- Meta tags para APK -->
-    <meta name="theme-color" content="#667eea">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="Control Tasmota">
-    <meta name="mobile-web-app-capable" content="yes">
-    
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-        }
+// Funciones de debug para verificar que tu app conecte correctamente con Tasmota
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 5px;
-            color: #333;
-            user-select: none;
-            -webkit-user-select: none;
-            -webkit-touch-callout: none;
-            overflow-x: hidden;
-        }
+// Función de prueba rápida de conectividad
+async function pruebaRapidaConectividad() {
+    const ip = deviceIP.value.trim();
+    if (!ip) {
+        showMessage('⚠️ Por favor ingresa la IP del dispositivo');
+        return;
+    }
 
-        .container {
-            max-width: 420px;
-            margin: 0 auto;
-            background: rgba(255, 255, 255, 0.98);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 15px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
-            min-height: calc(100vh - 10px);
-            position: relative;
-        }
+    console.log(`🔍 Probando conectividad con ${ip}...`);
+    showMessage('Probando conectividad...', 'success');
 
-        .header {
-            text-align: center;
-            margin-bottom: 15px;
-            padding: 10px 0;
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 15px;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-
-        .header h1 {
-            color: #4a5568;
-            font-size: 22px;
-            font-weight: 700;
-            margin-bottom: 8px;
-            text-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-
-        .connection-status {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            margin-top: 5px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-
-        .status-connected {
-            background: linear-gradient(135deg, #c6f6d5, #9ae6b4);
-            color: #2f855a;
-        }
-
-        .status-disconnected {
-            background: linear-gradient(135deg, #fed7d7, #feb2b2);
-            color: #c53030;
-        }
-
-        .status-connecting {
-            background: linear-gradient(135deg, #fef5e7, #f6e05e);
-            color: #d69e2e;
-        }
-
-        .temp-display {
-            background: linear-gradient(135deg, #4299e1, #3182ce);
-            color: white;
-            padding: 25px;
-            border-radius: 20px;
-            text-align: center;
-            margin-bottom: 15px;
-            box-shadow: 0 10px 30px rgba(66, 153, 225, 0.4);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .temp-display::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-            animation: shimmer 4s ease-in-out infinite;
-        }
-
-        @keyframes shimmer {
-            0%, 100% { transform: translateX(-100%) translateY(-100%) rotate(0deg); }
-            50% { transform: translateX(0%) translateY(0%) rotate(180deg); }
-        }
-
-        .temp-display h2 {
-            font-size: 32px;
-            font-weight: 700;
-            position: relative;
-            z-index: 1;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
-
-        .temp-unit {
-            font-size: 14px;
-            opacity: 0.9;
-            margin-top: 8px;
-            position: relative;
-            z-index: 1;
-        }
-
-        .mode-display {
-            background: linear-gradient(135deg, #48bb78, #38a169);
-            color: white;
-            padding: 16px;
-            border-radius: 16px;
-            text-align: center;
-            margin-bottom: 15px;
-            font-size: 16px;
-            font-weight: 600;
-            box-shadow: 0 8px 25px rgba(72, 187, 120, 0.4);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-        }
-
-        .countdown-display {
-            background: linear-gradient(135deg, #ed8936, #dd6b20);
-            color: white;
-            padding: 14px;
-            border-radius: 16px;
-            text-align: center;
-            margin-bottom: 15px;
-            font-size: 16px;
-            font-weight: 600;
-            display: none;
-            box-shadow: 0 8px 25px rgba(237, 137, 54, 0.4);
-            animation: pulse 2s ease-in-out infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.02); opacity: 0.9; }
-        }
-
-        .config-section {
-            background: linear-gradient(135deg, #f8fafc, #edf2f7);
-            padding: 18px;
-            border-radius: 16px;
-            margin-bottom: 15px;
-            border: 1px solid #e2e8f0;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        }
-
-        .config-title {
-            font-size: 14px;
-            font-weight: 700;
-            color: #4a5568;
-            margin-bottom: 15px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .input-row {
-            display: flex;
-            gap: 12px;
-            margin-bottom: 12px;
-        }
-
-        .input-group {
-            flex: 1;
-        }
-
-        .input-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            font-size: 12px;
-            color: #4a5568;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .input-group input {
-            width: 100%;
-            padding: 14px 16px;
-            border: 2px solid #e2e8f0;
-            border-radius: 12px;
-            font-size: 16px;
-            transition: all 0.3s ease;
-            background: white;
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
-        }
-
-        .input-group input:focus {
-            outline: none;
-            border-color: #4299e1;
-            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1), inset 0 2px 4px rgba(0,0,0,0.05);
-            transform: translateY(-1px);
-        }
-
-        .button {
-            width: 100%;
-            padding: 16px;
-            border: none;
-            border-radius: 16px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            margin-bottom: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            position: relative;
-            overflow: hidden;
-            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
-        }
-
-        .button::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            transition: left 0.5s;
-        }
-
-        .button:hover::before {
-            left: 100%;
-        }
-
-        .button:active {
-            transform: translateY(1px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        }
-
-        .button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none !important;
-        }
-
-        .btn-mode {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-        }
-
-        .btn-update {
-            background: linear-gradient(135deg, #4299e1, #3182ce);
-            color: white;
-        }
-
-        .btn-on {
-            background: linear-gradient(135deg, #48bb78, #38a169);
-            color: white;
-        }
-
-        .btn-off {
-            background: linear-gradient(135deg, #f56565, #e53e3e);
-            color: white;
-        }
-
-        .status-indicator {
-            display: inline-block;
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-            position: relative;
-            box-shadow: 0 0 10px currentColor;
-        }
-
-        .status-on {
-            background: #48bb78;
-            animation: blink-green 2s ease-in-out infinite;
-        }
-
-        .status-off {
-            background: #f56565;
-        }
-
-        .status-unknown {
-            background: #a0aec0;
-            animation: fade 2s ease-in-out infinite;
-        }
-
-        @keyframes blink-green {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        @keyframes fade {
-            0%, 100% { opacity: 0.5; }
-            50% { opacity: 1; }
-        }
-
-        .status-indicator::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: white;
-        }
-
-        .error-message, .success-message {
-            padding: 14px;
-            border-radius: 12px;
-            margin-bottom: 15px;
-            font-size: 14px;
-            font-weight: 500;
-            animation: slideIn 0.3s ease-out;
-        }
-
-        .error-message {
-            background: linear-gradient(135deg, #fed7d7, #feb2b2);
-            color: #c53030;
-            border-left: 4px solid #f56565;
-        }
-
-        .success-message {
-            background: linear-gradient(135deg, #c6f6d5, #9ae6b4);
-            color: #2f855a;
-            border-left: 4px solid #48bb78;
-        }
-
-        @keyframes slideIn {
-            from { transform: translateX(-100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-
-        .button-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-top: 15px;
-        }
-
-        .loading {
-            position: relative;
-            pointer-events: none;
-        }
-
-        .loading::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 20px;
-            height: 20px;
-            margin: -10px 0 0 -10px;
-            border: 2px solid transparent;
-            border-top-color: currentColor;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .version-info {
-            text-align: center;
-            padding: 10px;
-            font-size: 12px;
-            color: #718096;
-            border-top: 1px solid #e2e8f0;
-            margin-top: 20px;
-        }
-
-        /* Responsive para pantallas muy pequeñas */
-        @media (max-width: 380px) {
-            .container {
-                padding: 12px;
-                margin: 2px;
-                border-radius: 15px;
-            }
-            
-            .input-row {
-                flex-direction: column;
-                gap: 12px;
-            }
-            
-            .temp-display h2 {
-                font-size: 28px;
-            }
-            
-            .button {
-                padding: 14px;
-                font-size: 15px;
-            }
-        }
-
-        /* Orientación landscape en móviles */
-        @media (max-height: 500px) and (orientation: landscape) {
-            .container {
-                padding: 10px;
-            }
-            
-            .temp-display {
-                padding: 15px;
-            }
-            
-            .temp-display h2 {
-                font-size: 24px;
-            }
-            
-            .config-section {
-                padding: 12px;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>🌡️ Control Tasmota</h1>
-            <div class="connection-status status-disconnected" id="connectionStatus">
-                🔴 Desconectado
-            </div>
-        </div>
-
-        <div id="messages"></div>
-
-        <div class="temp-display">
-            <h2 id="lblTempActual">-- °C</h2>
-            <div class="temp-unit" id="lastUpdate">Iniciando...</div>
-        </div>
-
-        <div class="mode-display" id="lblModo">
-            <span>Modo: Automático</span>
-            <span class="status-indicator status-unknown" id="statusIndicator"></span>
-        </div>
-
-        <div class="countdown-display" id="lblCooldown"></div>
-
-        <div class="config-section">
-            <div class="config-title">⚙️ Configuración del Dispositivo</div>
-            <div class="input-group">
-                <label for="deviceIP">IP del Tasmota:</label>
-                <input type="text" id="deviceIP" value="192.168.1.16" placeholder="192.168.1.100" inputmode="url">
-            </div>
-        </div>
-
-        <div class="config-section">
-            <div class="config-title">🎯 Control de Temperatura</div>
-            <div class="input-row">
-                <div class="input-group">
-                    <label for="txtTempObjetivo">Objetivo (°C):</label>
-                    <input type="number" id="txtTempObjetivo" value="4" step="0.1" min="-20" max="50" inputmode="decimal">
-                </div>
-                <div class="input-group">
-                    <label for="txtDescanso">Descanso (s):</label>
-                    <input type="number" id="txtDescanso" value="180" min="30" max="3600" inputmode="numeric">
-                </div>
-            </div>
-        </div>
-
-        <button class="button btn-mode" id="btnCambiarModo">Cambiar a Manual</button>
-        <button class="button btn-update" id="btnActualizar">🔄 Actualizar Ahora</button>
+    try {
+        // Prueba 1: Status básico
+        console.log('📡 Prueba 1: Status básico...');
+        const statusUrl = `http://${ip}/cm?cmnd=Status`;
+        const statusData = await fetchWithFallback(statusUrl);
         
-        <div class="button-grid">
-            <button class="button btn-on" id="btnEncender">🟢 Encender</button>
-            <button class="button btn-off" id="btnApagar">🔴 Apagar</button>
-        </div>
+        if (statusData.Status) {
+            console.log('✅ Tasmota responde correctamente');
+            showMessage(`✅ Tasmota ${statusData.Status.FriendlyName} conectado`, 'success');
+        }
 
-        <div class="version-info">
-            <div class="connection-info" style="margin-bottom: 5px; font-weight: 600; color: #4a5568;">
-                <!-- Se actualiza automáticamente -->
-            </div>
-            Control Tasmota v2.0 - Desarrollado para Android APK
-        </div>
-    </div>
-
-    <script>
-        // Variables globales
-        let tempActual = null;
-        let modoAutomatico = true;
-        let ultimoApagado = null;
-        let enDescanso = false;
-        let descanso = 180;
-        let objetivo = 4;
-        let relayStatus = 'unknown';
-        let isConnected = false;
-        let readingTimer = null;
-        let uiTimer = null;
-        let lastSuccessfulRead = null;
-
-        // Elementos DOM
-        const lblTempActual = document.getElementById('lblTempActual');
-        const lblModo = document.getElementById('lblModo');
-        const lblCooldown = document.getElementById('lblCooldown');
-        const btnCambiarModo = document.getElementById('btnCambiarModo');
-        const btnActualizar = document.getElementById('btnActualizar');
-        const btnEncender = document.getElementById('btnEncender');
-        const btnApagar = document.getElementById('btnApagar');
-        const txtTempObjetivo = document.getElementById('txtTempObjetivo');
-        const txtDescanso = document.getElementById('txtDescanso');
-        const deviceIP = document.getElementById('deviceIP');
-        const statusIndicator = document.getElementById('statusIndicator');
-        const connectionStatus = document.getElementById('connectionStatus');
-        const lastUpdate = document.getElementById('lastUpdate');
-        const messages = document.getElementById('messages');
-
-        // Funciones de utilidad
-        function showMessage(text, type = 'error') {
-            const messageEl = document.createElement('div');
-            messageEl.className = `${type}-message`;
-            messageEl.textContent = text;
-            messages.appendChild(messageEl);
+        // Prueba 2: Lectura de sensores
+        console.log('🌡️ Prueba 2: Lectura de sensores...');
+        const sensorUrl = `http://${ip}/cm?cmnd=Status%2010`;
+        const sensorData = await fetchWithFallback(sensorUrl);
+        
+        console.log('📊 Datos completos del sensor:', sensorData);
+        
+        if (sensorData.StatusSNS) {
+            console.log('✅ StatusSNS encontrado:', sensorData.StatusSNS);
             
-            setTimeout(() => {
-                if (messageEl.parentNode) {
-                    messageEl.style.animation = 'slideOut 0.3s ease-in forwards';
-                    setTimeout(() => {
-                        if (messageEl.parentNode) {
-                            messageEl.parentNode.removeChild(messageEl);
-                        }
-                    }, 300);
-                }
-            }, 4000);
-        }
-
-        function updateConnectionStatus(connected) {
-            isConnected = connected;
-            const statusEl = connectionStatus;
+            // Buscar temperatura
+            let temperaturaEncontrada = null;
+            let sensorTipo = null;
             
-            if (connected) {
-                statusEl.className = 'connection-status status-connected';
-                statusEl.textContent = '🟢 Conectado';
-            } else {
-                statusEl.className = 'connection-status status-disconnected';
-                statusEl.textContent = '🔴 Desconectado';
+            // Buscar DS18B20
+            if (sensorData.StatusSNS.DS18B20) {
+                temperaturaEncontrada = sensorData.StatusSNS.DS18B20.Temperature;
+                sensorTipo = 'DS18B20';
+                console.log(`🎯 DS18B20 encontrado: ${temperaturaEncontrada}°C`);
             }
-        }
-
-        function setConnecting() {
-            connectionStatus.className = 'connection-status status-connecting';
-            connectionStatus.textContent = '🟡 Conectando...';
-        }
-
-        function updateStatusIndicator() {
-            statusIndicator.className = 'status-indicator';
-            if (relayStatus === 'ON') {
-                statusIndicator.classList.add('status-on');
-            } else if (relayStatus === 'OFF') {
-                statusIndicator.classList.add('status-off');
-            } else {
-                statusIndicator.classList.add('status-unknown');
+            // Buscar otros sensores
+            else if (sensorData.StatusSNS.DHT11) {
+                temperaturaEncontrada = sensorData.StatusSNS.DHT11.Temperature;
+                sensorTipo = 'DHT11';
             }
-        }
-
-        function setButtonLoading(button, loading) {
-            if (loading) {
-                button.classList.add('loading');
-                button.disabled = true;
-            } else {
-                button.classList.remove('loading');
-                button.disabled = false;
+            else if (sensorData.StatusSNS.DHT22) {
+                temperaturaEncontrada = sensorData.StatusSNS.DHT22.Temperature;
+                sensorTipo = 'DHT22';
             }
+            // Temperature directo
+            else if (sensorData.StatusSNS.Temperature !== undefined) {
+                temperaturaEncontrada = sensorData.StatusSNS.Temperature;
+                sensorTipo = 'Generic';
+            }
+
+            if (temperaturaEncontrada !== null && !isNaN(parseFloat(temperaturaEncontrada))) {
+                console.log(`🌡️ Temperatura detectada: ${temperaturaEncontrada}°C (Sensor: ${sensorTipo})`);
+                showMessage(`🌡️ ${sensorTipo}: ${temperaturaEncontrada}°C - ¡Funciona perfectamente!`, 'success');
+                
+                // Actualizar la UI directamente
+                tempActual = parseFloat(temperaturaEncontrada);
+                lblTempActual.textContent = `${tempActual.toFixed(1)} °C`;
+                lastUpdate.textContent = `${sensorTipo} - ${new Date().toLocaleTimeString()}`;
+                updateConnectionStatus(true);
+                
+                return true;
+            } else {
+                console.log('❌ No se encontró temperatura válida');
+                showMessage('❌ Sensor configurado pero sin lectura válida', 'error');
+            }
+        } else {
+            console.log('❌ No se encontró StatusSNS');
+            showMessage('❌ No hay datos de sensores. Verifica la configuración.', 'error');
         }
 
-        // Lista de proxies CORS de respaldo
-        const proxies = [
-            'https://api.allorigins.win/get?url=',
-            'https://corsproxy.io/?',
-            'https://cors-anywhere.herokuapp.com/',
-            'https://api.codetabs.com/v1/proxy?quest='
+        // Prueba 3: Estado del relay
+        console.log('🔌 Prueba 3: Estado del relay...');
+        if (statusData.Status && statusData.Status.Power !== undefined) {
+            relayStatus = statusData.Status.Power;
+            console.log(`🔌 Relay estado: ${relayStatus}`);
+            updateStatusIndicator();
+        }
+
+        return false;
+
+    } catch (error) {
+        console.error('❌ Error en prueba de conectividad:', error);
+        showMessage(`❌ Error: ${error.message}`, 'error');
+        updateConnectionStatus(false);
+        return false;
+    }
+}
+
+// Función para mostrar toda la información disponible del dispositivo
+async function mostrarInfoCompleta() {
+    const ip = deviceIP.value.trim();
+    if (!ip) {
+        showMessage('⚠️ Por favor ingresa la IP del dispositivo');
+        return;
+    }
+
+    console.log('📋 Obteniendo información completa del dispositivo...');
+    showMessage('Obteniendo información completa...', 'success');
+
+    try {
+        // Status completo
+        const urls = [
+            { name: 'Status General', url: `http://${ip}/cm?cmnd=Status` },
+            { name: 'Status Red', url: `http://${ip}/cm?cmnd=Status%205` },
+            { name: 'Status Sensores', url: `http://${ip}/cm?cmnd=Status%2010` },
+            { name: 'Status GPIO', url: `http://${ip}/cm?cmnd=Status%2011` }
         ];
 
-        let currentProxyIndex = 0;
-
-        // Funciones principales
-        async function leerTemperatura() {
-            const ip = deviceIP.value.trim();
-            if (!ip) {
-                showMessage('Por favor ingresa la IP del dispositivo');
-                return;
-            }
-
-            setConnecting();
-            setButtonLoading(btnActualizar, true);
-
+        for (let test of urls) {
             try {
-                const url = `http://${ip}/cm?cmnd=Status%2010`;
-                let data = await fetchWithFallback(url);
-
-        // Detectar si está corriendo como APK vs navegador web
-        const isAPK = window.location.protocol === 'file:' || 
-                     navigator.userAgent.includes('wv') ||
-                     window.AndroidInterface !== undefined ||
-                     !window.location.hostname;
-
-        const isBrowser = !isAPK;
-
-        if (isAPK) {
-            console.log('🚀 Ejecutándose como APK de Android - Sin restricciones CORS');
-        } else {
-            console.log('🌐 Ejecutándose en navegador web - Usando proxies CORS');
+                console.log(`\n📡 === ${test.name} ===`);
+                const data = await fetchWithFallback(test.url);
+                console.log(data);
+            } catch (error) {
+                console.log(`❌ Error en ${test.name}:`, error.message);
+            }
         }
 
-        // Función para intentar múltiples métodos de conexión
-        async function fetchWithFallback(url) {
-            // Si es APK, intentar conexión directa primero (sin CORS)
-            if (isAPK) {
-                try {
-                    console.log('🚀 APK: Conexión directa a Tasmota...');
-                    const response = await fetch(url, {
-                        method: 'GET',
-                        headers: {
-                            'Accept': 'application/json',
-                        }
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                    }
-                    
-                    const text = await response.text();
-                    if (!text || !text.trim()) {
-                        throw new Error('Respuesta vacía del dispositivo');
-                    }
-                    
-                    const data = JSON.parse(text);
-                    console.log('✅ APK: Conexión directa exitosa');
-                    return data;
-                } catch (directError) {
-                    console.log('❌ APK: Conexión directa falló:', directError.message);
-                    showMessage(`Error de conexión: ${directError.message}`);
-                    throw directError;
-                }
-            }
-            
-            // Para navegadores web, usar proxies CORS
-            console.log('🌐 Navegador: Usando proxies CORS...');
-            
-            for (let i = 0; i < proxies.length; i++) {
-                const proxyIndex = (currentProxyIndex + i) % proxies.length;
-                const proxy = proxies[proxyIndex];
-                
-                try {
-                    console.log(`🔄 Probando proxy ${proxyIndex + 1}/${proxies.length}: ${proxy.split('?')[0]}...`);
-                    
-                    let proxyUrl;
-                    if (proxy.includes('allorigins')) {
-                        proxyUrl = proxy + encodeURIComponent(url);
-                    } else if (proxy.includes('codetabs')) {
-                        proxyUrl = proxy + encodeURIComponent(url);
-                    } else {
-                        proxyUrl = proxy + url;
-                    }
-                    
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 10000);
-                    
-                    const response = await fetch(proxyUrl, {
-                        method: 'GET',
-                        headers: {
-                            'Accept': 'application/json',
-                        },
-                        signal: controller.signal
-                    });
-                    
-                    clearTimeout(timeoutId);
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}`);
-                    }
-                    
-                    const proxyData = await response.json();
-                    
-                    let actualData;
-                    if (proxy.includes('allorigins') && proxyData.contents) {
-                        actualData = JSON.parse(proxyData.contents);
-                    } else if (proxy.includes('codetabs') && proxyData.contents) {
-                        actualData = JSON.parse(proxyData.contents);
-                    } else {
-                        actualData = proxyData;
-                    }
-                    
-                    // Si llegamos aquí, el proxy funcionó
-                    currentProxyIndex = proxyIndex;
-                    console.log(`✅ Proxy ${proxyIndex + 1} exitoso`);
-                    return actualData;
-                    
-                } catch (proxyError) {
-                    console.log(`❌ Proxy ${proxyIndex + 1} falló:`, proxyError.message);
-                    
-                    if (proxyError.name === 'AbortError') {
-                        console.log('⏱️ Timeout en proxy');
-                    }
-                    
-                    continue;
-                }
-            }
-            
-            throw new Error('Todos los métodos de conexión fallaron. Verifica que el dispositivo esté en la misma red WiFi.');
-        }
+        showMessage('✅ Información completa mostrada en la consola', 'success');
 
-        async function leerTemperatura() {
-            const ip = deviceIP.value.trim();
-            if (!ip) {
-                showMessage('Por favor ingresa la IP del dispositivo');
-                return;
+    } catch (error) {
+        console.error('Error obteniendo información:', error);
+        showMessage(`Error: ${error.message}`, 'error');
+    }
+}
+
+// Función para optimizar la lectura automática
+function optimizarLecturaAutomatica() {
+    // Detener timers existentes
+    if (window.readingTimer) {
+        clearInterval(window.readingTimer);
+    }
+    
+    // Función de lectura optimizada
+    async function lecturaOptimizada() {
+        const ip = deviceIP.value.trim();
+        if (!ip) return;
+
+        try {
+            const url = `http://${ip}/cm?cmnd=Status%2010`;
+            const data = await fetchWithFallback(url);
+            
+            // Log cada 10 lecturas para no saturar consola
+            if (!window.lecturaCount) window.lecturaCount = 0;
+            window.lecturaCount++;
+            
+            if (window.lecturaCount % 10 === 0) {
+                console.log(`📊 Lectura #${window.lecturaCount}:`, data);
             }
 
-            setConnecting();
-            setButtonLoading(btnActualizar, true);
+            if (data.StatusSNS) {
+                let temp = null;
+                let sensor = 'Unknown';
 
-            try {
-                const url = `http://${ip}/cm?cmnd=Status%2010`;
-                const data = await fetchWithFallback(url);
-
-                console.log('Respuesta Tasmota:', data);
-
-                console.log('Respuesta Tasmota:', data);
-
-                // Procesar temperatura
-                let temperatura = null;
-                let powerStatus = null;
-
-                // Buscar temperatura en StatusSNS
-                if (data.StatusSNS) {
-                    const sensors = ['DS18B20', 'DHT11', 'DHT22', 'AM2301', 'SHT30', 'BME280', 'BMP280'];
-                    
-                    for (let sensor of sensors) {
-                        if (data.StatusSNS[sensor] && data.StatusSNS[sensor].Temperature !== undefined) {
-                            temperatura = parseFloat(data.StatusSNS[sensor].Temperature);
-                            console.log(`Temperatura encontrada en ${sensor}: ${temperatura}°C`);
-                            break;
-                        }
-                    }
-
-                    // Si no encuentra sensor específico, buscar Temperature directo
-                    if (temperatura === null && data.StatusSNS.Temperature !== undefined) {
-                        temperatura = parseFloat(data.StatusSNS.Temperature);
-                        console.log(`Temperatura directa: ${temperatura}°C`);
-                    }
+                // Detectar sensor y temperatura
+                if (data.StatusSNS.DS18B20) {
+                    temp = parseFloat(data.StatusSNS.DS18B20.Temperature);
+                    sensor = 'DS18B20';
+                } else if (data.StatusSNS.DHT11) {
+                    temp = parseFloat(data.StatusSNS.DHT11.Temperature);
+                    sensor = 'DHT11';
+                } else if (data.StatusSNS.DHT22) {
+                    temp = parseFloat(data.StatusSNS.DHT22.Temperature);
+                    sensor = 'DHT22';
+                } else if (data.StatusSNS.Temperature !== undefined) {
+                    temp = parseFloat(data.StatusSNS.Temperature);
+                    sensor = 'Generic';
                 }
 
-                // Buscar estado del power
-                if (data.StatusSTS && data.StatusSTS.POWER !== undefined) {
-                    powerStatus = data.StatusSTS.POWER;
-                } else if (data.POWER !== undefined) {
-                    powerStatus = data.POWER;
-                }
-
-                if (temperatura !== null && !isNaN(temperatura)) {
-                    tempActual = temperatura;
+                if (temp !== null && !isNaN(temp)) {
+                    tempActual = temp;
                     lblTempActual.textContent = `${tempActual.toFixed(1)} °C`;
-                    lastSuccessfulRead = new Date();
-                    lastUpdate.textContent = `Actualizado: ${lastSuccessfulRead.toLocaleTimeString()}`;
+                    lastUpdate.textContent = `${sensor} - ${new Date().toLocaleTimeString()}`;
                     updateConnectionStatus(true);
-
-                    // Actualizar estado del relay si está disponible
-                    if (powerStatus !== null) {
-                        relayStatus = powerStatus;
-                        updateStatusIndicator();
-                    }
-
-                    // Si estamos en modo automático, ejecutar control
+                    
+                    // Control automático
                     if (modoAutomatico) {
                         controlAutomatico();
                     }
-
-                    showMessage('Temperatura actualizada correctamente', 'success');
-                } else {
-                    throw new Error('No se encontró sensor de temperatura válido');
-                }
-
-            } catch (error) {
-                console.error('Error completo:', error);
-                updateConnectionStatus(false);
-                showMessage(`Error de conexión: ${error.message}`);
-                lblTempActual.textContent = '-- °C';
-                lastUpdate.textContent = 'Error de conexión';
-            } finally {
-                setButtonLoading(btnActualizar, false);
-            }
-        }
-
-        async function enviarComando(comando) {
-            const ip = deviceIP.value.trim();
-            if (!ip) {
-                showMessage('Por favor configura la IP del dispositivo');
-                return false;
-            }
-
-            try {
-                const url = `http://${ip}/cm?cmnd=Power%20${comando}`;
-                console.log(`Enviando comando: ${comando} a ${url}`);
-                
-                const data = await fetchWithFallback(url);
-                console.log('Respuesta comando:', data);
-                
-                if (data.POWER !== undefined) {
-                    relayStatus = data.POWER;
-                    updateStatusIndicator();
-                }
-                
-                showMessage(`✅ Comando "${comando}" ejecutado`, 'success');
-                
-                // Leer temperatura después de enviar comando para actualizar estado
-                setTimeout(leerTemperatura, 1000);
-                
-                return true;
-            } catch (error) {
-                console.error('Error al enviar comando:', error);
-                showMessage(`❌ Error: ${error.message}`);
-                return false;
-            }
-        }
-
-        function controlAutomatico() {
-            if (tempActual === null) return;
-
-            const objetivoNum = parseFloat(txtTempObjetivo.value) || 4;
-            let descansoNum = parseInt(txtDescanso.value) || 180;
-            
-            // Validar descanso mínimo
-            if (descansoNum < 30) {
-                descansoNum = 30;
-                txtDescanso.value = "30";
-            }
-            descanso = descansoNum;
-
-            console.log(`Control automático - Temp: ${tempActual}°C, Objetivo: ${objetivoNum}°C, Descanso: ${enDescanso}`);
-
-            // Lógica de histéresis ±0.5°C
-            
-            // Apagar si temperatura > objetivo + 0.5
-            if (tempActual > (objetivoNum + 0.5)) {
-                console.log(`Temperatura alta (${tempActual} > ${objetivoNum + 0.5}) - Apagando`);
-                enviarComando('Off');
-                ultimoApagado = Date.now();
-                enDescanso = true;
-                return;
-            }
-
-            // Encender si temperatura < objetivo - 0.5 Y no hay descanso activo
-            if (tempActual < (objetivoNum - 0.5)) {
-                console.log(`Temperatura baja (${tempActual} < ${objetivoNum - 0.5})`);
-                
-                if (enDescanso && ultimoApagado) {
-                    const elapsed = Math.floor((Date.now() - ultimoApagado) / 1000);
-                    console.log(`En descanso - Transcurrido: ${elapsed}s de ${descanso}s`);
                     
-                    if (elapsed >= descanso) {
-                        console.log('Descanso terminado - Encendiendo');
-                        enDescanso = false;
-                        lblCooldown.style.display = 'none';
-                        enviarComando('On');
+                    // Solo mostrar mensaje de éxito la primera vez
+                    if (!window.primeraLecturaExitosa) {
+                        showMessage(`✅ Lectura automática funcionando (${sensor})`, 'success');
+                        window.primeraLecturaExitosa = true;
                     }
                 } else {
-                    console.log('Sin descanso - Encendiendo');
-                    enviarComando('On');
-                }
-            }
-        }
-
-        function updateUI() {
-            // Actualizar cuenta regresiva
-            if (enDescanso && ultimoApagado) {
-                const elapsed = Math.floor((Date.now() - ultimoApagado) / 1000);
-                const remaining = Math.max(0, descanso - elapsed);
-                
-                if (remaining > 0) {
-                    const minutes = Math.floor(remaining / 60);
-                    const seconds = remaining % 60;
-                    const timeStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
-                    
-                    lblCooldown.textContent = `⏳ Descanso: ${timeStr} restantes`;
-                    lblCooldown.style.display = 'block';
-                } else {
-                    enDescanso = false;
-                    lblCooldown.style.display = 'none';
+                    throw new Error('Temperatura no válida');
                 }
             } else {
-                lblCooldown.style.display = 'none';
+                throw new Error('StatusSNS no encontrado');
             }
 
-            // Actualizar indicación de última lectura
-            if (lastSuccessfulRead) {
-                const timeSince = Math.floor((Date.now() - lastSuccessfulRead.getTime()) / 1000);
-                if (timeSince > 30) {
-                    lastUpdate.textContent = `Hace ${timeSince}s`;
-                    if (timeSince > 60) {
-                        updateConnectionStatus(false);
-                    }
-                }
+        } catch (error) {
+            console.error('Error en lectura automática:', error);
+            updateConnectionStatus(false);
+            
+            // Solo mostrar error cada 5 intentos para no saturar
+            if (window.errorCount % 5 === 0) {
+                showMessage(`Error de lectura: ${error.message}`, 'error');
             }
+            if (!window.errorCount) window.errorCount = 0;
+            window.errorCount++;
         }
+    }
 
-        function updateDisplay() {
-            const modoText = modoAutomatico ? 'Automático' : 'Manual';
-            const btnText = modoAutomatico ? 'Cambiar a Manual' : 'Cambiar a Automático';
-            
-            lblModo.innerHTML = `<span>Modo: ${modoText}</span><span class="status-indicator status-unknown" id="statusIndicator"></span>`;
-            btnCambiarModo.textContent = btnText;
-            
-            // Reestablecer referencia al indicador
-            const newIndicator = lblModo.querySelector('.status-indicator');
-            if (newIndicator) {
-                newIndicator.id = 'statusIndicator';
-                updateStatusIndicator();
-            }
-        }
+    // Iniciar lectura automática cada 5 segundos
+    window.readingTimer = setInterval(lecturaOptimizada, 5000);
+    
+    // Primera lectura inmediata
+    lecturaOptimizada();
+    
+    console.log('🔄 Lectura automática optimizada iniciada (cada 5 segundos)');
+    showMessage('🔄 Lectura automática iniciada', 'success');
+}
 
-        function saveSettings() {
-            try {
-                localStorage.setItem('tasmota-ip', deviceIP.value);
-                localStorage.setItem('tasmota-temp', txtTempObjetivo.value);
-                localStorage.setItem('tasmota-descanso', txtDescanso.value);
-                localStorage.setItem('tasmota-modo', modoAutomatico.toString());
-            } catch (e) {
-                console.log('No se pueden guardar configuraciones:', e);
-            }
-        }
-
-        function loadSettings() {
-            try {
-                const savedIP = localStorage.getItem('tasmota-ip');
-                const savedTemp = localStorage.getItem('tasmota-temp');
-                const savedDescanso = localStorage.getItem('tasmota-descanso');
-                const savedModo = localStorage.getItem('tasmota-modo');
-                
-                if (savedIP) deviceIP.value = savedIP;
-                if (savedTemp) txtTempObjetivo.value = savedTemp;
-                if (savedDescanso) txtDescanso.value = savedDescanso;
-                if (savedModo) {
-                    modoAutomatico = savedModo === 'true';
-                    updateDisplay();
-                }
-            } catch (e) {
-                console.log('No se pueden cargar configuraciones:', e);
-            }
-        }
-
-        function initialize() {
-            console.log('Iniciando aplicación Control Tasmota...');
-            
-            loadSettings();
-            updateDisplay();
-            updateConnectionInfo();
-            
-            // Iniciar timers
-            readingTimer = setInterval(leerTemperatura, 5000);
-            uiTimer = setInterval(updateUI, 1000);
-            
-            // Primera lectura después de un pequeño delay
-            setTimeout(leerTemperatura, 2000);
-            
-            const modeMsg = isAPK ? 
-                'Modo APK: Conexión directa a Tasmota' : 
-                'Modo Web: Usando proxies para CORS';
-            showMessage(modeMsg, 'success');
-        }
-
-        // Event Listeners
-        btnCambiarModo.addEventListener('click', function() {
-            modoAutomatico = !modoAutomatico;
-            updateDisplay();
-            saveSettings();
-            
-            showMessage(modoAutomatico ? 'Modo automático activado' : 'Modo manual activado', 'success');
-            
-            if (modoAutomatico && tempActual !== null) {
-                setTimeout(controlAutomatico, 1000);
-            }
+// Función para verificar configuración específica de nevera
+async function verificarConfiguracionNevera() {
+    console.log('❄️ Verificando configuración específica para nevera...');
+    
+    const temperaturaObjetivo = parseFloat(txtTempObjetivo.value) || 4;
+    const tiempoDescanso = parseInt(txtDescanso.value) || 180;
+    
+    // Verificaciones de configuración para nevera
+    let warnings = [];
+    
+    if (temperaturaObjetivo < 2 || temperaturaObjetivo > 8) {
+        warnings.push(`⚠️ Temperatura objetivo ${temperaturaObjetivo}°C puede no ser óptima para nevera (recomendado: 2-6°C)`);
+    }
+    
+    if (tiempoDescanso < 120) {
+        warnings.push(`⚠️ Tiempo de descanso ${tiempoDescanso}s es muy corto para compresor (recomendado: mín 120s)`);
+    }
+    
+    if (warnings.length > 0) {
+        warnings.forEach(warning => {
+            console.log(warning);
+            showMessage(warning, 'error');
         });
-
-        btnActualizar.addEventListener('click', function() {
-            showMessage('Actualizando temperatura...', 'success');
-            leerTemperatura();
-        });
-
-        btnEncender.addEventListener('click', async function() {
-            modoAutomatico = false;
-            updateDisplay();
-            saveSettings();
-            
-            setButtonLoading(this, true);
-            const success = await enviarComando('On');
-            setButtonLoading(this, false);
-            
-            if (success) {
-                showMessage('Dispositivo encendido manualmente', 'success');
-            }
-        });
-
-        btnApagar.addEventListener('click', async function() {
-            modoAutomatico = false;
-            updateDisplay();
-            saveSettings();
-            
-            setButtonLoading(this, true);
-            const success = await enviarComando('Off');
-            setButtonLoading(this, false);
-            
-            if (success) {
-                showMessage('Dispositivo apagado manualmente', 'success');
-            }
-        });
-
-        // Guardar configuración cuando cambien los inputs
-        deviceIP.addEventListener('change', function() {
-            saveSettings();
-            showMessage('IP guardada', 'success');
-        });
-
-        txtTempObjetivo.addEventListener('change', function() {
-            const valor = parseFloat(this.value);
-            if (isNaN(valor) || valor < -20 || valor > 50) {
-                this.value = 4;
-                showMessage('Temperatura debe estar entre -20°C y 50°C');
-                return;
-            }
-            saveSettings();
-        });
-
-        txtDescanso.addEventListener('change', function() {
-            let valor = parseInt(this.value);
-            if (isNaN(valor) || valor < 30) {
-                this.value = 30;
-                valor = 30;
-                showMessage('Descanso mínimo: 30 segundos');
-            } else if (valor > 3600) {
-                this.value = 3600;
-                valor = 3600;
-                showMessage('Descanso máximo: 1 hora');
-            }
-            saveSettings();
-        });
-
-        // Manejar visibilidad de la app
-        document.addEventListener('visibilitychange', function() {
-            if (document.hidden) {
-                console.log('App en background - pausando timers');
-                if (readingTimer) clearInterval(readingTimer);
-                if (uiTimer) clearInterval(uiTimer);
-            } else {
-                console.log('App en foreground - reanudando timers');
-                readingTimer = setInterval(leerTemperatura, 5000);
-                uiTimer = setInterval(updateUI, 1000);
-                // Lectura inmediata al volver
-                setTimeout(leerTemperatura, 500);
-            }
-        });
-
-        // Manejar pausa/resume en Android WebView
-        window.addEventListener('focus', function() {
-            console.log('App focused');
-            if (!readingTimer) {
-                readingTimer = setInterval(leerTemperatura, 5000);
-            }
-            if (!uiTimer) {
-                uiTimer = setInterval(updateUI, 1000);
-            }
-        });
-
-        window.addEventListener('blur', function() {
-            console.log('App blurred');
-        });
-
-        // Prevenir zoom en doble tap (para APK)
-        let lastTouchEnd = 0;
-        document.addEventListener('touchend', function (event) {
-            const now = (new Date()).getTime();
-            if (now - lastTouchEnd <= 300) {
-                event.preventDefault();
-            }
-            lastTouchEnd = now;
-        }, false);
-
-        // Manejar errores globales
-        window.addEventListener('error', function(e) {
-            console.error('Error global:', e.error);
-            showMessage('Error inesperado en la aplicación');
-        });
-
-        window.addEventListener('unhandledrejection', function(e) {
-            console.error('Promise rechazada:', e.reason);
-            showMessage('Error de conexión');
-            e.preventDefault();
-        });
-
-        // Añadir estilos para slideOut
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes slideOut {
-                from { transform: translateX(0); opacity: 1; }
-                to { transform: translateX(100%); opacity: 0; }
-            }
-        `;
-        document.head.appendChild(style);
-
-        // Mostrar información de conexión en la UI
-        function updateConnectionInfo() {
-            const infoDiv = document.querySelector('.connection-info');
-            if (infoDiv) {
-                infoDiv.textContent = isAPK ? 
-                    '📱 Modo APK - Conexión directa disponible' : 
-                    '🌐 Modo Web - Usando proxies CORS';
-            }
-        }
-
-        // Inicializar la aplicación
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM listo, inicializando...');
-            setTimeout(initialize, 100);
-        });
-
-        // Fallback si DOMContentLoaded ya pasó
-        if (document.readyState === 'loading') {
-            // Esperamos al DOMContentLoaded
+    } else {
+        console.log('✅ Configuración óptima para nevera');
+        showMessage('✅ Configuración óptima para nevera', 'success');
+    }
+    
+    // Verificar si tenemos lectura de temperatura
+    if (tempActual !== null) {
+        console.log(`🌡️ Temperatura actual: ${tempActual}°C`);
+        if (tempActual > 10) {
+            showMessage('⚠️ Temperatura muy alta para nevera. Verifica el sensor.', 'error');
+        } else if (tempActual < -5) {
+            showMessage('⚠️ Temperatura muy baja. Riesgo de congelación.', 'error');
         } else {
-            // DOM ya está listo
-            console.log('DOM ya estaba listo, inicializando inmediatamente...');
-            setTimeout(initialize, 100);
+            showMessage(`✅ Temperatura actual normal: ${tempActual}°C`, 'success');
         }
-    </script>
-</body>
-</html>
+    }
+}
+
+// Añadir botones de debug al DOM (opcional)
+function agregarBotonesDebug() {
+    const debugSection = document.createElement('div');
+    debugSection.className = 'config-section';
+    debugSection.innerHTML = `
+        <div class="config-title">🔧 Herramientas de Debug</div>
+        <button class="button btn-update" onclick="pruebaRapidaConectividad()">🔍 Prueba Rápida</button>
+        <button class="button btn-update" onclick="mostrarInfoCompleta()">📋 Info Completa</button>
+        <button class="button btn-update" onclick="optimizarLecturaAutomatica()">🔄 Optimizar Lectura</button>
+        <button class="button btn-update" onclick="verificarConfiguracionNevera()">❄️ Verificar Nevera</button>
+    `;
+    
+    // Insertar antes del último elemento
+    const container = document.querySelector('.container');
+    const versionInfo = document.querySelector('.version-info');
+    container.insertBefore(debugSection, versionInfo);
+}
+
+// Hacer funciones globales para poder usarlas desde botones
+window.pruebaRapidaConectividad = pruebaRapidaConectividad;
+window.mostrarInfoCompleta = mostrarInfoCompleta;
+window.optimizarLecturaAutomatica = optimizarLecturaAutomatica;
+window.verificarConfiguracionNevera = verificarConfiguracionNevera;
+
+// Auto-ejecutar prueba rápida cuando se carga
+document.addEventListener('DOMContentLoaded', function() {
+    // Agregar botones de debug (comentar si no los quieres)
+    // agregarBotonesDebug();
+    
+    // Ejecutar prueba automática después de 3 segundos
+    setTimeout(() => {
+        if (deviceIP.value.trim()) {
+            console.log('🚀 Ejecutando prueba automática de conectividad...');
+            pruebaRapidaConectividad();
+        }
+    }, 3000);
+});
